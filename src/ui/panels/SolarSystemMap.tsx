@@ -47,9 +47,9 @@ export const SolarSystemMap: React.FC = () => {
       </div>
 
       {/* Main Layout */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 360px', minHeight: 0 }}>
+      <div className="solar-layout">
         {/* Left: Interactive Solar System Grid */}
-        <div style={{ padding: 24, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 14, alignContent: 'start' }}>
+        <div style={{ padding: 16, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 10, alignContent: 'start' }}>
           {CELESTIAL_BODIES.map((body) => {
             const isSelected = body.id === selectedId;
             const orbited = progress.orbitedBodies.includes(body.id);
@@ -61,67 +61,67 @@ export const SolarSystemMap: React.FC = () => {
                 onClick={() => setSelectedId(body.id)}
                 className="ob-panel"
                 style={{
-                  padding: 16,
+                  padding: 13,
                   textAlign: 'left',
                   borderColor: isSelected ? 'var(--accent-cyan)' : 'var(--border-subtle)',
                   background: isSelected ? 'rgba(14, 165, 233, 0.14)' : 'var(--bg-card)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 10,
+                  gap: 8,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div
                     style={{
-                      width: 34,
-                      height: 34,
+                      width: 30,
+                      height: 30,
                       borderRadius: '50%',
                       background: `radial-gradient(circle at 30% 30%, ${body.color}, #020617)`,
-                      boxShadow: body.atmosphereColor ? `0 0 14px ${body.atmosphereColor}` : 'none',
+                      boxShadow: body.atmosphereColor ? `0 0 12px ${body.atmosphereColor}` : 'none',
                       flexShrink: 0,
                     }}
                   />
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{body.nameRu}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{body.nameRu}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                       {body.type === 'moon' ? 'Спутник' : 'Планета'}
                     </div>
                   </div>
                 </div>
 
-                <div className="ob-mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                  g: {body.surfaceGravity} м/с² • R: {Math.round(body.radius / 1000)} км
+                <div className="ob-mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                  g: {body.surfaceGravity} • R: {Math.round(body.radius / 1000)} км
                 </div>
 
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {body.playable ? (
-                    <span className="ob-badge" style={{ color: 'var(--accent-green)', borderColor: 'rgba(34,197,94,0.4)' }}>
+                    <span className="ob-badge" style={{ color: 'var(--accent-green)', borderColor: 'rgba(34,197,94,0.4)', fontSize: 10 }}>
                       ДОСТУПНО
                     </span>
                   ) : (
-                    <span className="ob-badge" style={{ color: 'var(--text-muted)' }}>
+                    <span className="ob-badge" style={{ color: 'var(--text-muted)', fontSize: 10 }}>
                       ДАЛЬНИЙ КОСМОС
                     </span>
                   )}
-                  {orbited && <span className="ob-badge" style={{ color: 'var(--accent-cyan)' }}>ОРБИТА</span>}
-                  {landed && <span className="ob-badge" style={{ color: 'var(--accent-orange)' }}>ПОСАДКА</span>}
+                  {orbited && <span className="ob-badge" style={{ color: 'var(--accent-cyan)', fontSize: 10 }}>ОРБИТА</span>}
+                  {landed && <span className="ob-badge" style={{ color: 'var(--accent-orange)', fontSize: 10 }}>ПОСАДКА</span>}
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Right: Detailed Body Inspector */}
+        {/* Right/Bottom: Detailed Body Inspector */}
         <div
-          className="ob-panel"
+          className="ob-panel solar-inspector"
           style={{
             borderRadius: 0,
             borderTop: 'none',
             borderRight: 'none',
-            padding: 20,
+            padding: 16,
             display: 'flex',
             flexDirection: 'column',
-            gap: 14,
+            gap: 12,
             overflowY: 'auto',
           }}
         >

@@ -1,10 +1,10 @@
 :root {
   --bg-deep: #04070f;
-  --bg-panel: rgba(11, 17, 30, 0.84);
+  --bg-panel: rgba(11, 17, 30, 0.86);
   --bg-panel-solid: #0c1322;
-  --bg-card: rgba(18, 28, 48, 0.78);
-  --border-subtle: rgba(148, 163, 184, 0.16);
-  --border-accent: rgba(56, 189, 248, 0.42);
+  --bg-card: rgba(18, 28, 48, 0.8);
+  --border-subtle: rgba(148, 163, 184, 0.18);
+  --border-accent: rgba(56, 189, 248, 0.48);
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
@@ -22,6 +22,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -29,6 +30,7 @@ body,
 #root {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg-deep);
   color: var(--text-primary);
@@ -51,35 +53,31 @@ select {
   color: var(--text-primary);
 }
 
-/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.45);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.32);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.55);
-}
 
-/* Reusable Aerospace Glass Panel */
+/* Aerospace Glass Panel */
 .ob-panel {
   background: var(--bg-panel);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
 .ob-title {
   font-family: var(--font-display);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -93,25 +91,29 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 9px 15px;
+  gap: 6px;
+  padding: 8px 13px;
   border-radius: 7px;
   font-size: 13px;
   font-weight: 600;
-  background: rgba(30, 41, 59, 0.85);
+  background: rgba(30, 41, 59, 0.88);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
-  transition: all 0.16s ease;
+  transition: all 0.14s ease;
+  white-space: nowrap;
 }
 
 .ob-btn:hover:not(:disabled) {
-  background: rgba(51, 65, 85, 0.92);
+  background: rgba(51, 65, 85, 0.95);
   border-color: var(--border-accent);
-  transform: translateY(-1px);
+}
+
+.ob-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .ob-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
@@ -119,40 +121,26 @@ select {
   background: linear-gradient(135deg, #0284c7, #0ea5e9);
   border-color: rgba(56, 189, 248, 0.65);
   color: #ffffff;
-  box-shadow: 0 4px 18px rgba(14, 165, 233, 0.28);
-}
-
-.ob-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0369a1, #38bdf8);
-  box-shadow: 0 6px 24px rgba(56, 189, 248, 0.4);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.28);
 }
 
 .ob-btn-launch {
   background: linear-gradient(135deg, #ea580c, #f97316);
-  border-color: rgba(251, 146, 60, 0.75);
+  border-color: rgba(251, 146, 60, 0.78);
   color: #ffffff;
   font-family: var(--font-display);
-  letter-spacing: 0.08em;
-  box-shadow: 0 4px 22px rgba(249, 115, 22, 0.35);
-}
-
-.ob-btn-launch:hover:not(:disabled) {
-  background: linear-gradient(135deg, #c2410c, #fb923c);
-  box-shadow: 0 6px 28px rgba(249, 115, 22, 0.5);
+  letter-spacing: 0.06em;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.35);
 }
 
 .ob-btn-danger {
-  background: rgba(153, 27, 27, 0.65);
+  background: rgba(153, 27, 27, 0.7);
   border-color: rgba(239, 68, 68, 0.5);
   color: #fecaca;
 }
 
-.ob-btn-danger:hover:not(:disabled) {
-  background: rgba(185, 28, 28, 0.85);
-}
-
 .ob-btn-active {
-  background: rgba(14, 165, 233, 0.22);
+  background: rgba(14, 165, 233, 0.24);
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
 }
@@ -166,8 +154,9 @@ select {
   font-size: 11px;
   font-weight: 600;
   font-family: var(--font-mono);
-  background: rgba(15, 23, 42, 0.78);
+  background: rgba(15, 23, 42, 0.8);
   border: 1px solid var(--border-subtle);
+  white-space: nowrap;
 }
 
 /* 3D Map HTML Tags */
@@ -178,7 +167,7 @@ select {
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
-  background: rgba(7, 11, 20, 0.85);
+  background: rgba(7, 11, 20, 0.88);
   border: 1px solid rgba(148, 163, 184, 0.4);
   color: #f8fafc;
   pointer-events: none;
@@ -197,25 +186,26 @@ select {
 /* Toasts */
 .ob-toast-stack {
   position: fixed;
-  top: 72px;
-  right: 18px;
-  z-index: 90;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 310px;
+  gap: 6px;
+  width: min(340px, calc(100vw - 24px));
   pointer-events: none;
 }
 
 .ob-toast {
   pointer-events: auto;
-  padding: 11px 14px;
+  padding: 10px 13px;
   border-radius: 8px;
   background: rgba(10, 16, 30, 0.94);
   border: 1px solid var(--border-subtle);
   border-left: 3px solid var(--accent-cyan);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  animation: slideIn 0.22s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  animation: toastIn 0.2s ease;
 }
 
 .ob-toast.success {
@@ -228,20 +218,124 @@ select {
   border-left-color: var(--accent-red);
 }
 
-@keyframes slideIn {
+@keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateX(22px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
-/* Mobile responsiveness */
+/* ================================
+   RESPONSIVE LAYOUTS
+   ================================ */
+
+/* Desktop vs Mobile visibility helpers */
+.ob-only-mobile {
+  display: none !important;
+}
+
+/* VAB Rocket Builder Layout */
+.vab-workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 290px 1fr 310px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vab-mobile-tabs {
+  display: none;
+}
+
+/* Solar System Map Layout */
+.solar-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Flight HUD Layout */
+.flight-hud-root {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) 12px;
+  gap: 8px;
+}
+
+.flight-desktop-panels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.flight-mobile-strip {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .ob-hide-mobile {
     display: none !important;
+  }
+  .ob-only-mobile {
+    display: flex !important;
+  }
+
+  /* Mobile VAB: 3D viewport on top (44%), tabbed panel below (56%) */
+  .vab-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .vab-viewport {
+    height: 44%;
+    min-height: 200px;
+    flex-shrink: 0;
+  }
+  .vab-mobile-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    background: #09101d;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .vab-drawer-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Mobile Solar Map */
+  .solar-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .solar-inspector {
+    max-height: 46%;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /* Mobile Flight HUD: slim top strip instead of giant side panels */
+  .flight-desktop-panels {
+    display: none;
+  }
+  .flight-mobile-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    padding: 7px 9px;
+    pointer-events: auto;
   }
 }

@@ -60,7 +60,8 @@ export const SpaceportOverlay: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: 18,
+        padding: 'max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) 12px',
+        gap: 10,
       }}
     >
       {/* Top Navigation & Resources Bar */}
@@ -68,63 +69,62 @@ export const SpaceportOverlay: React.FC = () => {
         className="ob-panel"
         style={{
           pointerEvents: 'auto',
-          padding: '10px 16px',
+          padding: '8px 12px',
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
+          gap: 8,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button className="ob-btn" onClick={() => setScreen('main_menu')} title="Главное меню">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="ob-btn" style={{ padding: '6px 9px' }} onClick={() => setScreen('main_menu')} title="Меню">
             <Home size={15} />
           </button>
           <div>
-            <div className="ob-title" style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent-cyan)' }}>
+            <div className="ob-title" style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-cyan)' }}>
               {progress.agencyName}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-              Космодром • Уровень {progress.spaceportLevel}
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+              Космодром ур. {progress.spaceportLevel}
             </div>
           </div>
         </div>
 
         {/* Currencies */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="ob-badge" style={{ padding: '6px 12px', fontSize: 13, color: '#fbbf24' }}>
-            <Coins size={14} />
-            <span>{progress.credits.toLocaleString()} ₵</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="ob-badge" style={{ padding: '4px 9px', fontSize: 12, color: '#fbbf24' }}>
+            <Coins size={13} />
+            <span>{progress.credits.toLocaleString()}</span>
           </div>
-          <div className="ob-badge" style={{ padding: '6px 12px', fontSize: 13, color: '#38bdf8' }}>
-            <Zap size={14} />
-            <span>{progress.science} ⚡</span>
+          <div className="ob-badge" style={{ padding: '4px 9px', fontSize: 12, color: '#38bdf8' }}>
+            <Zap size={13} />
+            <span>{progress.science}</span>
           </div>
         </div>
 
-        {/* Navigation buttons */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-          <button className="ob-btn" onClick={() => setActivePanel('missions')}>
-            <Target size={15} color="var(--accent-orange)" />
-            <span>Контракты</span>
+        {/* Nav Buttons */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          <button className="ob-btn" style={{ padding: '6px 9px', fontSize: 12 }} onClick={() => setActivePanel('missions')}>
+            <Target size={14} color="var(--accent-orange)" />
+            <span className="ob-hide-mobile">Контракты</span>
           </button>
-          <button className="ob-btn" onClick={() => setActivePanel('tech')}>
-            <FlaskConical size={15} color="var(--accent-cyan)" />
-            <span>Технологии</span>
+          <button className="ob-btn" style={{ padding: '6px 9px', fontSize: 12 }} onClick={() => setActivePanel('tech')}>
+            <FlaskConical size={14} color="var(--accent-cyan)" />
+            <span className="ob-hide-mobile">Наука</span>
           </button>
-          <button className="ob-btn" onClick={() => setScreen('solar_map')}>
-            <Globe size={15} color="#a78bfa" />
-            <span>Система</span>
+          <button className="ob-btn" style={{ padding: '6px 9px', fontSize: 12 }} onClick={() => setScreen('solar_map')}>
+            <Globe size={14} color="#a78bfa" />
+            <span className="ob-hide-mobile">Система</span>
           </button>
-          <button className="ob-btn" onClick={() => setActivePanel('profile')}>
-            <User size={15} />
-            <span className="ob-hide-mobile">Профиль</span>
+          <button className="ob-btn" style={{ padding: '6px 9px' }} onClick={() => setActivePanel('profile')} title="Профиль">
+            <User size={14} />
           </button>
-          <button className="ob-btn" onClick={() => setActivePanel('saves')}>
-            <Save size={15} />
+          <button className="ob-btn" style={{ padding: '6px 9px' }} onClick={() => setActivePanel('saves')} title="Сохранения">
+            <Save size={14} />
           </button>
-          <button className="ob-btn" onClick={() => setActivePanel('settings')}>
-            <Settings size={15} />
+          <button className="ob-btn" style={{ padding: '6px 9px' }} onClick={() => setActivePanel('settings')} title="Настройки">
+            <Settings size={14} />
           </button>
         </div>
       </div>
@@ -136,24 +136,24 @@ export const SpaceportOverlay: React.FC = () => {
           flexWrap: 'wrap',
           alignItems: 'flex-end',
           justifyContent: 'space-between',
-          gap: 16,
+          gap: 10,
         }}
       >
-        {/* Left: Active Rocket Selector & Engineering Summary */}
-        <div className="ob-panel" style={{ pointerEvents: 'auto', padding: 16, width: 340 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', letterSpacing: '0.1em', marginBottom: 6 }}>
-            РАКЕТА НА СТАРТОВОЙ ПЛОЩАДКЕ
+        {/* Active Rocket Selector */}
+        <div className="ob-panel" style={{ pointerEvents: 'auto', padding: 12, width: 'min(340px, 100%)' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-secondary)', letterSpacing: '0.08em', marginBottom: 5 }}>
+            РАКЕТА НА ПЛОЩАДКЕ
           </div>
           <select
             value={selectedBp.id}
             onChange={(e) => selectBlueprint(e.target.value)}
             style={{
               width: '100%',
-              padding: '9px 10px',
+              padding: '8px 10px',
               borderRadius: 6,
               background: 'rgba(15, 23, 42, 0.92)',
               border: '1px solid var(--border-accent)',
-              marginBottom: 12,
+              marginBottom: 9,
               fontSize: 13,
               fontWeight: 600,
             }}
@@ -169,67 +169,58 @@ export const SpaceportOverlay: React.FC = () => {
             className="ob-mono"
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 8,
-              fontSize: 12,
-              marginBottom: 12,
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 6,
+              fontSize: 11,
+              marginBottom: 8,
             }}
           >
-            <div style={{ background: 'var(--bg-card)', padding: '7px 9px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>МАССА</div>
+            <div style={{ background: 'var(--bg-card)', padding: '6px 7px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>МАССА</div>
               <div>{stats.totalWetMass.toFixed(1)} т</div>
             </div>
-            <div style={{ background: 'var(--bg-card)', padding: '7px 9px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>СТАРТ. TWR</div>
+            <div style={{ background: 'var(--bg-card)', padding: '6px 7px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>TWR</div>
               <div style={{ color: stats.launchTWR >= 1.15 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                 {stats.launchTWR.toFixed(2)}
               </div>
             </div>
-            <div style={{ background: 'var(--bg-card)', padding: '7px 9px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>DELTA-V</div>
-              <div style={{ color: 'var(--accent-cyan)' }}>{Math.round(stats.totalDeltaV)} м/с</div>
-            </div>
-            <div style={{ background: 'var(--bg-card)', padding: '7px 9px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>СТУПЕНЕЙ</div>
-              <div>{stats.stages.length}</div>
+            <div style={{ background: 'var(--bg-card)', padding: '6px 7px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>DELTA-V</div>
+              <div style={{ color: 'var(--accent-cyan)' }}>{Math.round(stats.totalDeltaV)}</div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-              Космодром ур. {progress.spaceportLevel}/5
-            </span>
-            {progress.spaceportLevel < 5 && (
-              <button
-                className="ob-btn"
-                style={{ padding: '5px 10px', fontSize: 11 }}
-                disabled={progress.credits < upgradeCost}
-                onClick={upgradeSpaceport}
-              >
-                <ArrowUpCircle size={13} color="var(--accent-cyan)" />
-                <span>Улучшить ({upgradeCost.toLocaleString()} ₵)</span>
-              </button>
-            )}
-          </div>
+          {progress.spaceportLevel < 5 && (
+            <button
+              className="ob-btn"
+              style={{ width: '100%', padding: '6px 10px', fontSize: 11 }}
+              disabled={progress.credits < upgradeCost}
+              onClick={upgradeSpaceport}
+            >
+              <ArrowUpCircle size={13} color="var(--accent-cyan)" />
+              <span>Улучшить космодром ({upgradeCost.toLocaleString()} ₵)</span>
+            </button>
+          )}
         </div>
 
-        {/* Right: Primary Actions (VAB & LAUNCH) */}
-        <div style={{ pointerEvents: 'auto', display: 'flex', gap: 12 }}>
+        {/* Primary Actions */}
+        <div style={{ pointerEvents: 'auto', display: 'flex', gap: 8, width: 'min(340px, 100%)', justifyContent: 'flex-end' }}>
           <button
             className="ob-btn ob-btn-primary"
-            style={{ padding: '15px 22px', fontSize: 14 }}
+            style={{ flex: 1, padding: '13px 16px', fontSize: 13 }}
             onClick={() => setScreen('builder')}
           >
-            <Wrench size={18} />
-            <span>КОНСТРУКТОР РАКЕТ (VAB)</span>
+            <Wrench size={16} />
+            <span>КОНСТРУКТОР</span>
           </button>
 
           <button
             className="ob-btn ob-btn-launch"
-            style={{ padding: '15px 30px', fontSize: 16 }}
+            style={{ flex: 1, padding: '13px 20px', fontSize: 14 }}
             onClick={handleLaunch}
           >
-            <Rocket size={20} />
+            <Rocket size={18} />
             <span>ЗАПУСК</span>
           </button>
         </div>

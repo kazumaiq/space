@@ -15,15 +15,15 @@ import { useGameStore } from '@/stores/useGameStore';
 import { TrajectoryPrediction } from '@/game/core/types';
 import { getPartDef } from '@/data/partsCatalog';
 
-const PLANET_SCALE = 0.001; // 1 unit = 1 km for distant planets & map view
+const PLANET_SCALE = 0.001; // 1 unit = 1 km for planetary view
 
 const LaunchSmoke: React.FC<{ active: boolean; altitude: number }> = ({ active, altitude }) => {
   const groupRef = useRef<THREE.Group>(null);
   const puffs = useMemo(
     () =>
-      Array.from({ length: 14 }, (_, i) => ({
-        angle: (i / 14) * Math.PI * 2,
-        speed: 4 + (i % 4) * 2.2,
+      Array.from({ length: 10 }, (_, i) => ({
+        angle: (i / 10) * Math.PI * 2,
+        speed: 2.2 + (i % 3) * 1.1,
         offset: (i * 0.37) % 1,
       })),
     []
@@ -34,28 +34,28 @@ const LaunchSmoke: React.FC<{ active: boolean; altitude: number }> = ({ active, 
     const t = clock.elapsedTime;
     groupRef.current.children.forEach((child, idx) => {
       const p = puffs[idx];
-      const phase = (t * 0.9 + p.offset) % 1;
-      const dist = phase * p.speed * 3.2;
+      const phase = (t * 1.1 + p.offset) % 1;
+      const dist = 1.2 + phase * p.speed * 2.2;
       child.position.set(
         Math.cos(p.angle) * dist,
-        -2.5 + phase * 1.4,
+        -2.2 - phase * 1.8,
         Math.sin(p.angle) * dist
       );
-      const sc = 0.8 + phase * 3.8;
+      const sc = 0.35 + phase * 1.15;
       child.scale.setScalar(sc);
       const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      mat.opacity = active && altitude < 180 ? (1 - phase) * 0.45 : 0;
+      mat.opacity = active && altitude < 120 ? (1 - phase) * 0.28 : 0;
     });
   });
 
-  if (!active || altitude > 200) return null;
+  if (!active || altitude > 140) return null;
 
   return (
     <group ref={groupRef}>
       {puffs.map((_, i) => (
         <mesh key={i}>
-          <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color="#cbd5e1" transparent opacity={0.35} depthWrite={false} />
+          <icosahedronGeometry args={[0.85, 1]} />
+          <meshStandardMaterial color="#e2e8f0" transparent opacity={0.22} depthWrite={false} />
         </mesh>
       ))}
     </group>
@@ -64,18 +64,12 @@ const LaunchSmoke: React.FC<{ active: boolean; altitude: number }> = ({ active, 
 
 const SurfaceRover: React.FC<{ visible: boolean }> = ({ visible }) => {
   const roverRef = useRef<THREE.Group>(null);
-  const posRef = useRef({ x: 5, z: 4, heading: 0 });
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }) => {
     if (!visible || !roverRef.current) return;
-    // Simple rover drive using arrow / WASD while deployed
-    const t = performance.now() * 0.001;
-    roverRef.current.position.set(
-      posRef.current.x + Math.sin(t * 0.25) * 1.5,
-      -0.8,
-      posRef.current.z + Math.cos(t * 0.25) * 1.5
-    );
-    roverRef.current.rotation.y = t * 0.25;
+    const t = clock.elapsedTime * 0.3;
+    roverRef.current.position.set(5 + Math.sin(t) * 1.5, -0.8, 4 + Math.cos(t) * 1.5);
+    roverRef.current.rotation.y = t;
   });
 
   if (!visible) return null;
@@ -106,6 +100,22 @@ const SurfaceRover: React.FC<{ visible: boolean }> = ({ visible }) => {
   );
 };
 
+const ResponsiveCameraSetup: React.FC<{ mapView: boolean }> = ({ mapView }) => {
+  const { camera, size } = useThree();
+
+  useEffect(() => {
+    const isPortrait = size.width < size.height;
+    if (mapView) {
+      camera.position.set(0, isPortrait ? 130 : 90, isPortrait ? 195 : 145);
+    } else {
+      camera.position.set(isPortrait ? 22 : 16, isPortrait ? 12 : 10, isPortrait ? 28 : 22);
+    }
+    camera.updateProjectionMatrix();
+  }, [mapView, size.width, size.height, camera]);
+
+  return null;
+};
+
 const FlightSimulationLoop: React.FC = () => {
   const { scene } = useThree();
   const rocketGroupRef = useRef<THREE.Group>(null);
@@ -118,7 +128,6 @@ const FlightSimulationLoop: React.FC = () => {
   const lastWorkerReqRef = useRef(0);
 
   const mapView = useGameStore((s) => s.mapView);
-  const timeWarp = useGameStore((s) => s.timeWarp);
   const graphics = useGameStore((s) => s.graphics);
   const telemetry = useGameStore((s) => s.telemetry);
   const trajectory = useGameStore((s) => s.trajectory);
@@ -185,7 +194,6 @@ const FlightSimulationLoop: React.FC = () => {
     },
   });
 
-  // Setup Web Worker for off-thread orbital trajectory prediction
   useEffect(() => {
     const worker = new Worker(
       new URL('@/game/orbital/trajectory.worker.ts', import.meta.url),
@@ -208,14 +216,13 @@ const FlightSimulationLoop: React.FC = () => {
     const inputs = readInputs();
     const store = useGameStore.getState();
 
-    // Limit time warp while in atmosphere or engines thrusting
     const activeBody = getBodyById(flightEngine.soiBodyId);
     const rMag = Math.sqrt(
       flightEngine.position.x ** 2 +
         flightEngine.position.y ** 2 +
         flightEngine.position.z ** 2
     );
-    const alt = rMag - activeBody.radius;
+    const alt = Math.max(0, rMag - activeBody.radius);
     const effectiveWarp =
       alt < activeBody.atmosphereHeight && store.timeWarp > 5
         ? 5
@@ -223,23 +230,21 @@ const FlightSimulationLoop: React.FC = () => {
 
     flightEngine.step(dt, inputs, effectiveWarp);
 
-    // Update sound engine
     const inAtmo = activeBody.atmosphereHeight > 0 && alt < activeBody.atmosphereHeight;
     const thrustRatio = flightEngine.ignited
       ? Math.min(1, flightEngine.getTelemetry().thrustKN / 220)
       : 0;
     soundEngine.updateEngineThrust(thrustRatio, inAtmo);
 
-    // Update rocket orientation in local 3D view
     if (rocketGroupRef.current) {
       rocketGroupRef.current.quaternion.copy(flightEngine.orientation);
     }
 
-    // Update sky background color (blue sky at Earth sea level -> deep black space)
+    // Smooth atmospheric sky gradient from Earth surface to deep space
     if (!store.mapView) {
       if (flightEngine.soiBodyId === 'earth' && alt < 65_000) {
         const t = Math.max(0, Math.min(1, 1 - alt / 65_000));
-        const sky = new THREE.Color('#02050b').lerp(new THREE.Color('#133a6b'), Math.pow(t, 1.5));
+        const sky = new THREE.Color('#02050b').lerp(new THREE.Color('#0e2f56'), Math.pow(t, 1.4));
         scene.background = sky;
       } else {
         scene.background = new THREE.Color('#02050b');
@@ -248,30 +253,31 @@ const FlightSimulationLoop: React.FC = () => {
       scene.background = new THREE.Color('#02050b');
     }
 
-    // Position the active planet relative to rocket (floating origin, scaled to avoid float32 overflow)
+    // Position the active planet cleanly below the rocket without clipping the launchpad
     if (planetGroupRef.current && !store.mapView) {
-      // Planet visual radius scaled down smoothly when high, exact horizon when low
-      const distKm = rMag * PLANET_SCALE;
       const dirX = -flightEngine.position.x / Math.max(1, rMag);
       const dirY = -flightEngine.position.y / Math.max(1, rMag);
       const dirZ = -flightEngine.position.z / Math.max(1, rMag);
 
-      // Keep planet mesh at exact visual distance in km-units (1 unit = 1m near ground, transitioning smoothly)
-      const visualScale = alt < 25_000 ? 0.01 : PLANET_SCALE;
-      const visualRadius = activeBody.radius * visualScale;
-      const visualDist = visualRadius + alt * visualScale;
-      planetGroupRef.current.position.set(
-        dirX * visualDist,
-        dirY * visualDist,
-        dirZ * visualDist
-      );
-      planetGroupRef.current.scale.setScalar(visualScale / PLANET_SCALE);
-      void distKm;
+      // Hide spherical globe while very close to Earth launchpad (launchpad apron provides horizon),
+      // then reveal curved Earth cleanly above 800 m so there is zero z-fighting or gray clipping.
+      if (flightEngine.soiBodyId === 'earth' && alt < 800) {
+        planetGroupRef.current.visible = false;
+      } else {
+        planetGroupRef.current.visible = true;
+        const visualRadius = activeBody.radius * PLANET_SCALE; // 600 units for Earth
+        const visualDist = visualRadius + Math.max(12, alt * PLANET_SCALE);
+        planetGroupRef.current.position.set(
+          dirX * visualDist,
+          dirY * visualDist,
+          dirZ * visualDist
+        );
+      }
     }
 
-    // Position launchpad near rocket when low on Earth
+    // Launchpad & surface ground apron on Earth
     if (padGroupRef.current && !store.mapView) {
-      if (flightEngine.soiBodyId === 'earth' && alt < 4000) {
+      if (flightEngine.soiBodyId === 'earth' && alt < 2500) {
         padGroupRef.current.visible = true;
         padGroupRef.current.position.set(
           -flightEngine.position.x,
@@ -283,7 +289,7 @@ const FlightSimulationLoop: React.FC = () => {
       }
     }
 
-    // Position Moon in local sky when in Earth SOI
+    // Moon visible in Earth sky
     if (moonMeshRef.current && !store.mapView) {
       const moonPos = getBodyWorldPosition('moon', flightEngine.simTime);
       const dx = moonPos.x - flightEngine.position.x;
@@ -291,7 +297,6 @@ const FlightSimulationLoop: React.FC = () => {
       const dz = moonPos.z - flightEngine.position.z;
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       const dir = new THREE.Vector3(dx, dy, dz).normalize();
-      // Place Moon in skybox distance proportional to real angular size
       const skyDist = 2200;
       const moonBody = getBodyById('moon');
       const apparentRadius = Math.max(18, (moonBody.radius / Math.max(1, d)) * skyDist * 1.4);
@@ -300,7 +305,6 @@ const FlightSimulationLoop: React.FC = () => {
       moonMeshRef.current.visible = flightEngine.soiBodyId === 'earth';
     }
 
-    // Throttle React/Zustand telemetry updates to ~15 Hz for ultra-smooth 60 FPS rendering
     const now = performance.now();
     if (now - lastUiUpdateRef.current > 66) {
       lastUiUpdateRef.current = now;
@@ -314,7 +318,6 @@ const FlightSimulationLoop: React.FC = () => {
         tel.phase === 'LANDED'
       );
 
-      // Evaluate missions
       const hasSci = flightEngine.hasPartCapability(
         (id) => Boolean(getPartDef(id)?.isScience)
       );
@@ -332,7 +335,6 @@ const FlightSimulationLoop: React.FC = () => {
       }
     }
 
-    // Request trajectory prediction from Web Worker every 400ms
     if (now - lastWorkerReqRef.current > 400 && workerRef.current) {
       lastWorkerReqRef.current = now;
       workerRef.current.postMessage({
@@ -346,26 +348,26 @@ const FlightSimulationLoop: React.FC = () => {
   });
 
   const activeBody = getBodyById(telemetry?.soiBodyId ?? 'earth');
-  const minY = flightEngine.parts.reduce(
-    (acc, p) => (p.detached ? acc : Math.min(acc, p.position[1])),
-    0
-  );
+  const activeParts = flightEngine.parts.filter((p) => !p.detached);
+  const centerY =
+    activeParts.length > 0
+      ? activeParts.reduce((acc, p) => acc + p.position[1], 0) / activeParts.length
+      : 0;
   const reentryHeat =
     telemetry && telemetry.atmosphericTempK > 450
       ? Math.min(1, (telemetry.atmosphericTempK - 450) / 1100)
       : 0;
 
-  // Orbital Map View points
   const mapPoints = useMemo(() => {
     if (!trajectory || trajectory.points.length < 2) return null;
-    const scale = 0.00001; // 100 km = 1 unit in Map View
+    const scale = 0.00001;
     return trajectory.points.map(
       (pt) => new THREE.Vector3(pt.x * scale, pt.y * scale, pt.z * scale)
     );
   }, [trajectory]);
 
   const moonOrbitRing = useMemo(() => {
-    const r = 12_000_000 * 0.00001; // 120 units
+    const r = 12_000_000 * 0.00001;
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= 96; i++) {
       const a = (i / 96) * Math.PI * 2;
@@ -375,7 +377,7 @@ const FlightSimulationLoop: React.FC = () => {
   }, []);
 
   if (mapView) {
-    const scale = 0.00001; // 100 km = 1 scene unit
+    const scale = 0.00001;
     const moonPos = getBodyWorldPosition('moon', flightEngine.simTime);
     const shipWorldPos =
       flightEngine.soiBodyId === 'moon'
@@ -393,9 +395,9 @@ const FlightSimulationLoop: React.FC = () => {
 
     return (
       <group>
+        <ResponsiveCameraSetup mapView />
         <SpaceBackdrop starCount={Math.min(3500, graphics.starCount)} sunDirection={[250, 80, 180]} />
 
-        {/* Earth in Map View */}
         <PlanetMesh
           bodyId="earth"
           radius={600_000 * scale}
@@ -405,13 +407,10 @@ const FlightSimulationLoop: React.FC = () => {
           segments={48}
         />
 
-        {/* Moon Orbit Ring */}
         <Line points={moonOrbitRing} color="#475569" lineWidth={1} transparent opacity={0.55} />
 
-        {/* Moon in Map View */}
         <group position={[moonPos.x * scale, moonPos.y * scale, moonPos.z * scale]}>
           <PlanetMesh bodyId="moon" radius={175_000 * scale} rotationSpeed={0.005} segments={32} />
-          {/* Moon SOI wireframe */}
           <mesh>
             <sphereGeometry args={[2_400_000 * scale, 24, 24]} />
             <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.08} />
@@ -421,7 +420,6 @@ const FlightSimulationLoop: React.FC = () => {
           </Html>
         </group>
 
-        {/* Predicted Trajectory Curve */}
         {mapPoints && (
           <group position={trajOffset}>
             <Line
@@ -470,7 +468,6 @@ const FlightSimulationLoop: React.FC = () => {
           </group>
         )}
 
-        {/* Spacecraft Icon in Map View */}
         <mesh position={[shipWorldPos.x * scale, shipWorldPos.y * scale, shipWorldPos.z * scale]}>
           <octahedronGeometry args={[0.55, 0]} />
           <meshBasicMaterial color="#22c55e" />
@@ -483,9 +480,9 @@ const FlightSimulationLoop: React.FC = () => {
 
   return (
     <group>
+      <ResponsiveCameraSetup mapView={false} />
       <SpaceBackdrop starCount={graphics.starCount} sunDirection={[140, 60, 110]} />
 
-      {/* Active SOI Planet (floating origin) */}
       <group ref={planetGroupRef}>
         <PlanetMesh
           bodyId={activeBody.id}
@@ -497,19 +494,17 @@ const FlightSimulationLoop: React.FC = () => {
         />
       </group>
 
-      {/* Distant Moon in sky */}
       <group ref={moonMeshRef}>
         <PlanetMesh bodyId="moon" radius={175} rotationSpeed={0} segments={32} />
       </group>
 
-      {/* Launchpad when close to Earth surface */}
       <group ref={padGroupRef}>
         <SpaceportComplex level={useGameStore.getState().progress.spaceportLevel} />
       </group>
 
-      {/* Player Spacecraft at floating origin [0, 0, 0] */}
+      {/* Center rocket visually around [0, 0, 0] */}
       <group ref={rocketGroupRef}>
-        <group position={[0, -minY, 0]}>
+        <group position={[0, -centerY, 0]}>
           <RocketMesh
             parts={flightEngine.parts}
             throttle={telemetry?.throttle ?? 0}
@@ -526,10 +521,8 @@ const FlightSimulationLoop: React.FC = () => {
         />
       </group>
 
-      {/* Surface Rover when deployed after landing */}
       <SurfaceRover visible={Boolean(telemetry?.roverDeployed && telemetry?.phase === 'LANDED')} />
 
-      {/* Detached debris stages */}
       {flightEngine.debris.map((d) => {
         const dx = d.position.x - flightEngine.position.x;
         const dy = d.position.y - flightEngine.position.y;
@@ -544,9 +537,9 @@ const FlightSimulationLoop: React.FC = () => {
 
       <OrbitControls
         makeDefault
-        target={[0, 4, 0]}
+        target={[0, 0, 0]}
         enablePan={false}
-        minDistance={8}
+        minDistance={10}
         maxDistance={120}
       />
     </group>
@@ -555,14 +548,13 @@ const FlightSimulationLoop: React.FC = () => {
 
 export const FlightScene: React.FC = () => {
   const graphics = useGameStore((s) => s.graphics);
-  const mapView = useGameStore((s) => s.mapView);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
       <Canvas
         shadows={graphics.shadows}
         camera={{
-          position: mapView ? [0, 90, 145] : [18, 12, 22],
+          position: [18, 11, 24],
           fov: 48,
           near: 0.2,
           far: 14000,

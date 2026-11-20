@@ -12,6 +12,10 @@ import {
   ArrowDownToLine,
   Umbrella,
   Cpu,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { getBodyById } from '@/data/solarSystem';
 import { getPartDef } from '@/data/partsCatalog';
@@ -19,12 +23,12 @@ import { flightEngine } from '@/game/physics/flightEngine';
 import { sharedTouchInputs } from '@/game/controls/useFlightControls';
 import { soundEngine } from '@/services/audio/soundEngine';
 import { useGameStore } from '@/stores/useGameStore';
-import { FlightPhase, SasMode } from '@/game/core/types';
+import { FlightPhase, FlightTelemetry, SasMode } from '@/game/core/types';
 
 function formatAltitude(m: number): string {
   if (!isFinite(m)) return '∞';
   if (Math.abs(m) >= 1_000_000) return `${(m / 1_000_000).toFixed(2)} Мм`;
-  if (Math.abs(m) >= 1_000) return `${(m / 1_000).toFixed(2)} км`;
+  if (Math.abs(m) >= 1_000) return `${(m / 1_000).toFixed(1)} км`;
   return `${Math.round(m)} м`;
 }
 
@@ -38,13 +42,13 @@ function formatTime(sec: number): string {
 }
 
 const PHASE_LABELS: Record<FlightPhase, { text: string; color: string }> = {
-  PRELAUNCH: { text: 'НА СТАРТЕ', color: '#94a3b8' },
-  ASCENT: { text: 'НАБОР ВЫСОТЫ', color: '#f97316' },
+  PRELAUNCH: { text: 'СТАРТ', color: '#94a3b8' },
+  ASCENT: { text: 'ВЗЛЁТ', color: '#f97316' },
   ATMOSPHERIC: { text: 'АТМОСФЕРА', color: '#38bdf8' },
   SUBORBITAL: { text: 'СУБОРБИТА', color: '#fbbf24' },
-  LOW_ORBIT: { text: 'НИЗКАЯ ОРБИТА', color: '#22c55e' },
-  HIGH_ORBIT: { text: 'ВЫСОКАЯ ОРБИТА', color: '#22c55e' },
-  ESCAPE: { text: 'УХОД С ОРБИТЫ', color: '#a78bfa' },
+  LOW_ORBIT: { text: 'ОРБИТА LEO', color: '#22c55e' },
+  HIGH_ORBIT: { text: 'ВЫС. ОРБИТА', color: '#22c55e' },
+  ESCAPE: { text: 'УХОД', color: '#a78bfa' },
   LUNAR_TRANSFER: { text: 'СФЕРА ЛУНЫ', color: '#38bdf8' },
   LUNAR_ORBIT: { text: 'ОРБИТА ЛУНЫ', color: '#22c55e' },
   DESCENT: { text: 'СНИЖЕНИЕ', color: '#f97316' },
@@ -52,7 +56,32 @@ const PHASE_LABELS: Record<FlightPhase, { text: string; color: string }> = {
   CRASHED: { text: 'АВАРИЯ', color: '#ef4444' },
 };
 
-const SAS_MODES: SasMode[] = ['OFF', 'STABILITY', 'PROGRADE', 'RETROGRADE'];
+const SAS_MODES: SasMode[] = ['STABILITY', 'PROGRADE', 'RETROGRADE', 'OFF'];
+
+function getFlightHint(t: FlightTelemetry): string {
+  if (t.phase === 'PRELAUNCH') {
+    return 'Нажмите «ЗАПУСК» внизу (или Space), чтобы зажечь двигатели';
+  }
+  if (t.phase === 'ASCENT' && t.altitude < 10_000) {
+    return 'Набор высоты! После 10 км начните плавный наклон вправо для выхода на орбиту';
+  }
+  if (t.phase === 'ASCENT' && t.altitude >= 10_000) {
+    return 'Наклоняйте ракету к горизонту (D / ▶), чтобы разогнать орбитальную скорость';
+  }
+  if (t.phase === 'SUBORBITAL') {
+    return 'Вы в космосе! Включите SAS → PRO и ускорьтесь возле Апогея (Ap), чтобы замкнуть орбиту';
+  }
+  if (t.phase === 'LOW_ORBIT' || t.phase === 'HIGH_ORBIT') {
+    return 'Стабильная орбита! Проведите научный эксперимент или откройте Карту (M) для полёта к Луне';
+  }
+  if (t.phase === 'LANDED') {
+    return 'Успешная посадка! Выпустите планетоход или соберите образцы грунта';
+  }
+  if (t.phase === 'DESCENT') {
+    return 'Снижение! Раскройте парашют в атмосфере или тормозите в режиме SAS → RETRO';
+  }
+  return '';
+}
 
 export const FlightHUD: React.FC = () => {
   const {
@@ -74,11 +103,27 @@ export const FlightHUD: React.FC = () => {
   const body = getBodyById(telemetry.soiBodyId);
   const phaseInfo = PHASE_LABELS[telemetry.phase];
   const fuelPct = telemetry.fuelTotal > 0 ? (telemetry.fuelRemaining / telemetry.fuelTotal) * 100 : 0;
+  const hint = getFlightHint(telemetry);
 
   const hasScience = flightEngine.hasPartCapability((id) => Boolean(getPartDef(id)?.isScience));
   const hasChute = flightEngine.hasPartCapability((id) => Boolean(getPartDef(id)?.isParachute));
   const hasLegs = flightEngine.hasPartCapability((id) => Boolean(getPartDef(id)?.isLandingLeg));
   const hasSolar = flightEngine.hasPartCapability((id) => Boolean(getPartDef(id)?.isSolarPanel));
+
+  const warps = telemetry.altitude > body.atmosphereHeight ? [1, 2, 5, 10, 50] : [1, 2, 5, 10];
+
+  const handleCycleWarp = () => {
+    const idx = warps.indexOf(timeWarp);
+    const next = warps[(idx + 1) % warps.length];
+    setTimeWarp(next);
+    soundEngine.playClick();
+  };
+
+  const handleCycleSas = () => {
+    const idx = SAS_MODES.indexOf(telemetry.sasMode);
+    flightEngine.sasMode = SAS_MODES[(idx + 1) % SAS_MODES.length];
+    soundEngine.playClick();
+  };
 
   const handleStageButton = () => {
     const res = flightEngine.triggerStage();
@@ -117,9 +162,7 @@ export const FlightHUD: React.FC = () => {
     addSurfaceSample({
       id: `sci_${Date.now()}`,
       bodyId: telemetry.soiBodyId,
-      name: isLanded
-        ? `Грунт: ${body.nameRu}`
-        : `Орбитальная телеметрия (${body.nameRu})`,
+      name: isLanded ? `Грунт: ${body.nameRu}` : `Орбитальная телеметрия (${body.nameRu})`,
       scienceValue: sciVal,
       creditValue: credVal,
       collectedAt: Date.now(),
@@ -129,137 +172,163 @@ export const FlightHUD: React.FC = () => {
   const handleToggleRover = () => {
     flightEngine.roverDeployed = !flightEngine.roverDeployed;
     soundEngine.playClick();
-    if (flightEngine.roverDeployed) {
-      pushToast({
-        title: 'Планетоход развёрнут',
-        body: `Автономное исследование поверхности (${body.nameRu}) начато.`,
-        type: 'success',
-      });
-    }
   };
 
-  const isTouchDevice =
+  const isTouch =
     controls.showTouchControls === 'always' ||
     (controls.showTouchControls === 'auto' &&
       typeof window !== 'undefined' &&
-      'ontouchstart' in window);
-
-  const warps = telemetry.altitude > body.atmosphereHeight ? [1, 2, 5, 10, 50] : [1, 2, 5, 10];
+      (window.innerWidth <= 900 || 'ontouchstart' in window));
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 15,
-        pointerEvents: 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: 14,
-      }}
-    >
-      {/* TOP BAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-        {/* Left: Phase + SOI + MET */}
+    <div className="flight-hud-root">
+      {/* TOP BAR + MOBILE COMPACT TELEMETRY */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div
-          className="ob-panel"
           style={{
-            pointerEvents: 'auto',
-            padding: '8px 14px',
             display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            gap: 14,
+            gap: 6,
+            width: '100%',
           }}
         >
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>СФЕРА ВЛИЯНИЯ</div>
-            <div className="ob-title" style={{ fontSize: 13, color: 'var(--accent-cyan)' }}>
+          {/* Status Pill */}
+          <div
+            className="ob-panel"
+            style={{
+              pointerEvents: 'auto',
+              padding: '6px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              minWidth: 0,
+            }}
+          >
+            <span className="ob-title" style={{ fontSize: 12, color: 'var(--accent-cyan)' }}>
               {body.nameRu}
+            </span>
+            <span
+              className="ob-badge"
+              style={{
+                borderColor: phaseInfo.color,
+                color: phaseInfo.color,
+                padding: '2px 6px',
+                fontSize: 10,
+              }}
+            >
+              {phaseInfo.text}
+            </span>
+            <span className="ob-mono ob-hide-mobile" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              T+{formatTime(telemetry.missionTime)}
+            </span>
+          </div>
+
+          {/* Right Action Controls (never overflows on mobile!) */}
+          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <button
+              className={`ob-btn ${timeWarp > 1 ? 'ob-btn-active' : ''}`}
+              style={{ padding: '6px 9px', fontSize: 11 }}
+              onClick={handleCycleWarp}
+              title="Ускорение времени"
+            >
+              <FastForward size={13} color="var(--accent-orange)" />
+              <span className="ob-mono">{timeWarp}x</span>
+            </button>
+
+            <button
+              className={`ob-btn ${mapView ? 'ob-btn-primary' : ''}`}
+              style={{ padding: '6px 9px', fontSize: 11 }}
+              onClick={() => setMapView(!mapView)}
+              title="Орбитальная карта (M)"
+            >
+              <Map size={14} />
+              <span className="ob-hide-mobile">{mapView ? 'Ракета' : 'Орбита'}</span>
+            </button>
+
+            <button
+              className="ob-btn"
+              style={{ padding: '6px 8px' }}
+              onClick={handleResetFlight}
+              title="Перезапуск"
+            >
+              <RotateCcw size={14} />
+            </button>
+
+            <button
+              className="ob-btn"
+              style={{ padding: '6px 8px' }}
+              onClick={() => {
+                soundEngine.updateEngineThrust(0, false);
+                setScreen('spaceport');
+              }}
+              title="На космодром"
+            >
+              <Home size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* MOBILE SLIM TELEMETRY STRIP (leaves center 3D rocket 100% clear!) */}
+        <div className="ob-panel ob-mono flight-mobile-strip">
+          <div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>ВЫСОТА</div>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>{formatAltitude(telemetry.altitude)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>СКОРОСТЬ</div>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>{Math.round(telemetry.speed)} м/с</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>АПОГЕЙ</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-cyan)' }}>
+              {formatAltitude(telemetry.orbital.apoapsis)}
             </div>
           </div>
+          <div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>ТОПЛИВО</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: fuelPct < 15 ? 'var(--accent-red)' : '#38bdf8' }}>
+              {Math.round(fuelPct)}%
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic 1-line Flight Guide */}
+        {hint && (
           <div
-            className="ob-badge"
             style={{
-              borderColor: phaseInfo.color,
-              color: phaseInfo.color,
-              padding: '4px 9px',
+              alignSelf: 'center',
+              padding: '4px 12px',
+              borderRadius: 99,
+              background: 'rgba(11, 17, 30, 0.72)',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              fontSize: 11,
+              color: '#cbd5e1',
+              textAlign: 'center',
+              maxWidth: '94%',
             }}
           >
-            {phaseInfo.text}
+            {hint}
           </div>
-          <div className="ob-mono" style={{ fontSize: 12 }}>
-            <span style={{ color: 'var(--text-muted)', marginRight: 5 }}>T+</span>
-            {formatTime(telemetry.missionTime)}
-          </div>
-        </div>
-
-        {/* Center: Time Warp */}
-        <div
-          className="ob-panel"
-          style={{
-            pointerEvents: 'auto',
-            padding: '6px 10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-          }}
-        >
-          <FastForward size={14} color="var(--accent-orange)" />
-          {warps.map((w) => (
-            <button
-              key={w}
-              className={`ob-btn ${timeWarp === w ? 'ob-btn-active' : ''}`}
-              style={{ padding: '4px 8px', fontSize: 11 }}
-              onClick={() => setTimeWarp(w)}
-            >
-              {w}x
-            </button>
-          ))}
-        </div>
-
-        {/* Right: Map / Reset / Return */}
-        <div style={{ pointerEvents: 'auto', display: 'flex', gap: 7 }}>
-          <button
-            className={`ob-btn ${mapView ? 'ob-btn-primary' : ''}`}
-            onClick={() => setMapView(!mapView)}
-          >
-            <Map size={15} />
-            <span>{mapView ? 'Камера ракеты' : 'Орбита (M)'}</span>
-          </button>
-          <button className="ob-btn" onClick={handleResetFlight} title="Повторить запуск">
-            <RotateCcw size={15} />
-          </button>
-          <button
-            className="ob-btn"
-            onClick={() => {
-              soundEngine.updateEngineThrust(0, false);
-              setScreen('spaceport');
-            }}
-            title="Вернуться на космодром"
-          >
-            <Home size={15} />
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* MIDDLE ROW: Left Telemetry + Right Orbital Data */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        {/* LEFT TELEMETRY */}
+      {/* DESKTOP SIDE TELEMETRY PANELS (hidden on mobile <= 900px) */}
+      <div className="flight-desktop-panels">
         <div
           className="ob-panel ob-mono"
           style={{
             pointerEvents: 'auto',
             padding: 13,
-            width: 235,
+            width: 228,
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
+            gap: 7,
             fontSize: 12,
           }}
         >
           <div className="ob-title" style={{ fontSize: 11, color: 'var(--accent-cyan)' }}>
-            ТЕЛЕМЕТРИЯ ПОЛЁТА
+            ТЕЛЕМЕТРИЯ
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Высота</span>
@@ -276,12 +345,6 @@ export const FlightHUD: React.FC = () => {
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Ускорение</span>
-            <span>
-              {telemetry.acceleration.toFixed(1)} м/с² ({telemetry.gForce.toFixed(1)}G)
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Тяга / TWR</span>
             <span style={{ color: 'var(--accent-orange)' }}>
               {Math.round(telemetry.thrustKN)} кН ({telemetry.twr.toFixed(2)})
@@ -289,16 +352,14 @@ export const FlightHUD: React.FC = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Масса</span>
-            <span>{telemetry.massTons.toFixed(2)} т</span>
+            <span>{telemetry.massTons.toFixed(1)} т</span>
           </div>
-
-          {/* Fuel bar */}
-          <div style={{ marginTop: 4 }}>
+          <div style={{ marginTop: 2 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
               <span style={{ color: 'var(--text-secondary)' }}>ТОПЛИВО</span>
               <span>{fuelPct.toFixed(0)}%</span>
             </div>
-            <div style={{ height: 7, borderRadius: 4, background: 'rgba(30,41,59,0.9)', overflow: 'hidden' }}>
+            <div style={{ height: 6, borderRadius: 4, background: 'rgba(30,41,59,0.9)', overflow: 'hidden' }}>
               <div
                 style={{
                   width: `${Math.min(100, fuelPct)}%`,
@@ -308,40 +369,22 @@ export const FlightHUD: React.FC = () => {
               />
             </div>
           </div>
-
-          {/* Electric charge bar */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
-              <span style={{ color: 'var(--text-secondary)' }}>ЭНЕРГИЯ</span>
-              <span>{Math.round(telemetry.electricCharge)}%</span>
-            </div>
-            <div style={{ height: 5, borderRadius: 4, background: 'rgba(30,41,59,0.9)', overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${telemetry.electricCharge}%`,
-                  height: '100%',
-                  background: '#22c55e',
-                }}
-              />
-            </div>
-          </div>
         </div>
 
-        {/* RIGHT ORBITAL DATA */}
         <div
-          className="ob-panel ob-mono ob-hide-mobile"
+          className="ob-panel ob-mono"
           style={{
             pointerEvents: 'auto',
             padding: 13,
-            width: 240,
+            width: 230,
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
+            gap: 7,
             fontSize: 12,
           }}
         >
           <div className="ob-title" style={{ fontSize: 11, color: 'var(--accent-orange)' }}>
-            ОРБИТАЛЬНЫЕ ПАРАМЕТРЫ
+            ОРБИТА
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Апогей (Ap)</span>
@@ -365,232 +408,226 @@ export const FlightHUD: React.FC = () => {
             <span>{telemetry.orbital.eccentricity.toFixed(3)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Наклонение</span>
-            <span>{((telemetry.orbital.inclination * 180) / Math.PI).toFixed(1)}°</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Период</span>
             <span>{formatTime(telemetry.orbital.orbitalPeriod)}</span>
           </div>
-
           {trajectory?.encounterBodyId === 'moon' && (
-            <div
-              className="ob-badge"
-              style={{
-                marginTop: 4,
-                borderColor: '#f97316',
-                color: '#fb923c',
-                justifyContent: 'center',
-              }}
-            >
-              ПЕРЕХВАТ ЛУНЫ ОБНАРУЖЕН!
-            </div>
-          )}
-
-          {/* Contextual Surface Exploration Panel when landed */}
-          {telemetry.phase === 'LANDED' && (
-            <div
-              style={{
-                marginTop: 6,
-                paddingTop: 8,
-                borderTop: '1px solid var(--border-subtle)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              <div style={{ fontSize: 10, color: 'var(--accent-green)', fontWeight: 700 }}>
-                ИССЛЕДОВАНИЕ ПОВЕРХНОСТИ
-              </div>
-              <button className="ob-btn ob-btn-primary" style={{ fontSize: 11 }} onClick={handleToggleRover}>
-                <Cpu size={13} />
-                <span>{telemetry.roverDeployed ? 'Вернуть планетоход' : 'Выпустить планетоход'}</span>
-              </button>
-              <button className="ob-btn" style={{ fontSize: 11 }} onClick={handleScienceExperiment}>
-                <FlaskConical size={13} color="var(--accent-cyan)" />
-                <span>Собрать образцы грунта</span>
-              </button>
+            <div className="ob-badge" style={{ borderColor: '#f97316', color: '#fb923c', justifyContent: 'center' }}>
+              ПЕРЕХВАТ ЛУНЫ!
             </div>
           )}
         </div>
       </div>
 
-      {/* BOTTOM CONTROL DECK */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12 }}>
-        {/* Left: Throttle Control */}
-        <div
-          className="ob-panel"
-          style={{
-            pointerEvents: 'auto',
-            padding: '10px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>ТЯГА (SHIFT/CTRL)</div>
-            <div className="ob-mono" style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent-orange)' }}>
-              {Math.round(telemetry.throttle * 100)}%
-            </div>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={telemetry.throttle}
-            onChange={(e) => flightEngine.setThrottle(Number(e.target.value))}
-            style={{ width: 110, accentColor: '#f97316' }}
-          />
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button className="ob-btn" style={{ padding: '4px 7px', fontSize: 11 }} onClick={() => flightEngine.setThrottle(0)}>
-              0%
-            </button>
-            <button className="ob-btn" style={{ padding: '4px 7px', fontSize: 11 }} onClick={() => flightEngine.setThrottle(1)}>
-              100%
-            </button>
-          </div>
-        </div>
-
-        {/* Center: SAS + Systems + Stage Trigger */}
-        <div
-          className="ob-panel"
-          style={{
-            pointerEvents: 'auto',
-            padding: '9px 12px',
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          {/* SAS */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Compass size={15} color="var(--accent-cyan)" />
-            {SAS_MODES.map((m) => (
-              <button
-                key={m}
-                className={`ob-btn ${telemetry.sasMode === m ? 'ob-btn-active' : ''}`}
-                style={{ padding: '5px 8px', fontSize: 10 }}
-                onClick={() => {
-                  flightEngine.sasMode = m;
-                  soundEngine.playClick();
-                }}
-              >
-                {m === 'OFF' ? 'SAS OFF' : m === 'STABILITY' ? 'STAB' : m === 'PROGRADE' ? 'PRO' : 'RETRO'}
-              </button>
-            ))}
-          </div>
-
-          {hasChute && (
-            <button
-              className={`ob-btn ${telemetry.parachutesDeployed ? 'ob-btn-active' : ''}`}
-              style={{ padding: '6px 10px', fontSize: 11 }}
-              onClick={() => flightEngine.toggleParachutes()}
-            >
-              <Umbrella size={14} />
-              <span>Парашют (P)</span>
-            </button>
-          )}
-
-          {hasLegs && (
-            <button
-              className={`ob-btn ${telemetry.landingLegsDeployed ? 'ob-btn-active' : ''}`}
-              style={{ padding: '6px 10px', fontSize: 11 }}
-              onClick={() => flightEngine.toggleLandingLegs()}
-            >
-              <ArrowDownToLine size={14} />
-              <span>Опоры (G)</span>
-            </button>
-          )}
-
-          {hasSolar && (
-            <button
-              className={`ob-btn ${telemetry.solarPanelsDeployed ? 'ob-btn-active' : ''}`}
-              style={{ padding: '6px 10px', fontSize: 11 }}
-              onClick={() => flightEngine.toggleSolarPanels()}
-            >
-              <Sun size={14} />
-              <span>Панели (L)</span>
-            </button>
-          )}
-
-          {hasScience && (
-            <button
-              className="ob-btn ob-btn-primary"
-              style={{ padding: '6px 10px', fontSize: 11 }}
-              onClick={handleScienceExperiment}
-            >
-              <FlaskConical size={14} />
-              <span>Наука</span>
-            </button>
-          )}
-
-          <button
-            className="ob-btn ob-btn-launch"
-            style={{ padding: '9px 18px', fontSize: 13 }}
-            onClick={handleStageButton}
-          >
-            <Flame size={16} />
-            <span>
-              {!flightEngine.ignited
-                ? 'ЗАЖИГАНИЕ (SPACE)'
-                : telemetry.currentStage > 0
-                  ? `СТУПЕНЬ ${telemetry.currentStage}/${telemetry.maxStage + 1} (SPACE)`
-                  : 'ПОСЛЕДНЯЯ СТУПЕНЬ'}
-            </span>
-          </button>
-        </div>
-
-        {/* Mobile Virtual Touch Controls */}
-        {isTouchDevice && (
+      {/* BOTTOM CONTROL DECK (100% responsive, fits 360px mobile & desktop!) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, width: '100%' }}>
+        {/* Landed surface action bar */}
+        {telemetry.phase === 'LANDED' && (
           <div
             className="ob-panel"
             style={{
               pointerEvents: 'auto',
-              padding: 8,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 40px)',
-              gap: 4,
+              padding: '8px 10px',
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 8,
+              alignSelf: 'center',
             }}
           >
-            <div />
-            <button
-              className="ob-btn"
-              onPointerDown={() => (sharedTouchInputs.pitch = 1)}
-              onPointerUp={() => (sharedTouchInputs.pitch = 0)}
-              onPointerLeave={() => (sharedTouchInputs.pitch = 0)}
-            >
-              W
+            <button className="ob-btn ob-btn-primary" style={{ fontSize: 12 }} onClick={handleToggleRover}>
+              <Cpu size={14} />
+              <span>{telemetry.roverDeployed ? 'Убрать ровер' : 'Выпустить планетоход'}</span>
             </button>
-            <div />
-            <button
-              className="ob-btn"
-              onPointerDown={() => (sharedTouchInputs.yaw = -1)}
-              onPointerUp={() => (sharedTouchInputs.yaw = 0)}
-              onPointerLeave={() => (sharedTouchInputs.yaw = 0)}
-            >
-              A
-            </button>
-            <button
-              className="ob-btn"
-              onPointerDown={() => (sharedTouchInputs.pitch = -1)}
-              onPointerUp={() => (sharedTouchInputs.pitch = 0)}
-              onPointerLeave={() => (sharedTouchInputs.pitch = 0)}
-            >
-              S
-            </button>
-            <button
-              className="ob-btn"
-              onPointerDown={() => (sharedTouchInputs.yaw = 1)}
-              onPointerUp={() => (sharedTouchInputs.yaw = 0)}
-              onPointerLeave={() => (sharedTouchInputs.yaw = 0)}
-            >
-              D
+            <button className="ob-btn" style={{ fontSize: 12 }} onClick={handleScienceExperiment}>
+              <FlaskConical size={14} color="var(--accent-cyan)" />
+              <span>Собрать грунт</span>
             </button>
           </div>
         )}
+
+        {/* Main bottom row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 8,
+            width: '100%',
+          }}
+        >
+          {/* Left: Throttle + Systems */}
+          <div
+            className="ob-panel"
+            style={{
+              pointerEvents: 'auto',
+              padding: '8px 10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 7,
+              flex: isTouch ? 1 : '0 1 auto',
+              minWidth: 0,
+            }}
+          >
+            {/* Throttle row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="ob-mono" style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-orange)', minWidth: 38 }}>
+                {Math.round(telemetry.throttle * 100)}%
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={telemetry.throttle}
+                onChange={(e) => flightEngine.setThrottle(Number(e.target.value))}
+                style={{ flex: 1, minWidth: 70, maxWidth: 140, accentColor: '#f97316' }}
+              />
+              <button
+                className="ob-btn"
+                style={{ padding: '4px 7px', fontSize: 10 }}
+                onClick={() => flightEngine.setThrottle(telemetry.throttle > 0.1 ? 0 : 1)}
+              >
+                {telemetry.throttle > 0.1 ? 'СТОП' : 'МАКС'}
+              </button>
+            </div>
+
+            {/* Systems + Primary Launch/Stage button */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5 }}>
+              <button
+                className={`ob-btn ${telemetry.sasMode !== 'OFF' ? 'ob-btn-active' : ''}`}
+                style={{ padding: '6px 8px', fontSize: 11 }}
+                onClick={handleCycleSas}
+                title="Переключить режим SAS (T)"
+              >
+                <Compass size={13} />
+                <span>
+                  SAS:{' '}
+                  {telemetry.sasMode === 'OFF'
+                    ? 'OFF'
+                    : telemetry.sasMode === 'STABILITY'
+                      ? 'STAB'
+                      : telemetry.sasMode === 'PROGRADE'
+                        ? 'PRO'
+                        : 'RETRO'}
+                </span>
+              </button>
+
+              {hasChute && (
+                <button
+                  className={`ob-btn ${telemetry.parachutesDeployed ? 'ob-btn-active' : ''}`}
+                  style={{ padding: '6px 8px', fontSize: 11 }}
+                  onClick={() => flightEngine.toggleParachutes()}
+                  title="Парашют (P)"
+                >
+                  <Umbrella size={13} />
+                </button>
+              )}
+
+              {hasLegs && (
+                <button
+                  className={`ob-btn ${telemetry.landingLegsDeployed ? 'ob-btn-active' : ''}`}
+                  style={{ padding: '6px 8px', fontSize: 11 }}
+                  onClick={() => flightEngine.toggleLandingLegs()}
+                  title="Посадочные опоры (G)"
+                >
+                  <ArrowDownToLine size={13} />
+                </button>
+              )}
+
+              {hasSolar && (
+                <button
+                  className={`ob-btn ${telemetry.solarPanelsDeployed ? 'ob-btn-active' : ''}`}
+                  style={{ padding: '6px 8px', fontSize: 11 }}
+                  onClick={() => flightEngine.toggleSolarPanels()}
+                  title="Солнечные панели (L)"
+                >
+                  <Sun size={13} />
+                </button>
+              )}
+
+              {hasScience && (
+                <button
+                  className="ob-btn ob-btn-primary"
+                  style={{ padding: '6px 8px', fontSize: 11 }}
+                  onClick={handleScienceExperiment}
+                  title="Научный эксперимент"
+                >
+                  <FlaskConical size={13} />
+                </button>
+              )}
+
+              <button
+                className="ob-btn ob-btn-launch"
+                style={{ padding: '7px 14px', fontSize: 12, marginLeft: 'auto' }}
+                onClick={handleStageButton}
+              >
+                <Flame size={15} />
+                <span>
+                  {!flightEngine.ignited
+                    ? 'ЗАПУСК'
+                    : telemetry.currentStage > 0
+                      ? `СТУПЕНЬ ${telemetry.currentStage}`
+                      : 'СТУП. 1'}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Compact Touch Steering D-pad (only on mobile / touch) */}
+          {isTouch && (
+            <div
+              className="ob-panel"
+              style={{
+                pointerEvents: 'auto',
+                padding: 6,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 34px)',
+                gridTemplateRows: 'repeat(2, 34px)',
+                gap: 4,
+                flexShrink: 0,
+              }}
+            >
+              <div />
+              <button
+                className="ob-btn"
+                style={{ padding: 0 }}
+                onPointerDown={() => (sharedTouchInputs.pitch = 1)}
+                onPointerUp={() => (sharedTouchInputs.pitch = 0)}
+                onPointerLeave={() => (sharedTouchInputs.pitch = 0)}
+              >
+                <ChevronUp size={16} />
+              </button>
+              <div />
+              <button
+                className="ob-btn"
+                style={{ padding: 0 }}
+                onPointerDown={() => (sharedTouchInputs.yaw = -1)}
+                onPointerUp={() => (sharedTouchInputs.yaw = 0)}
+                onPointerLeave={() => (sharedTouchInputs.yaw = 0)}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                className="ob-btn"
+                style={{ padding: 0 }}
+                onPointerDown={() => (sharedTouchInputs.pitch = -1)}
+                onPointerUp={() => (sharedTouchInputs.pitch = 0)}
+                onPointerLeave={() => (sharedTouchInputs.pitch = 0)}
+              >
+                <ChevronDown size={16} />
+              </button>
+              <button
+                className="ob-btn"
+                style={{ padding: 0 }}
+                onPointerDown={() => (sharedTouchInputs.yaw = 1)}
+                onPointerUp={() => (sharedTouchInputs.yaw = 0)}
+                onPointerLeave={() => (sharedTouchInputs.yaw = 0)}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* CRASH MODAL */}
@@ -599,30 +636,30 @@ export const FlightHUD: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(10, 4, 8, 0.72)',
+            background: 'rgba(10, 4, 8, 0.78)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             pointerEvents: 'auto',
             zIndex: 50,
+            padding: 16,
           }}
         >
-          <div className="ob-panel" style={{ padding: 26, width: 390, textAlign: 'center', borderColor: 'var(--accent-red)' }}>
-            <AlertTriangle size={40} color="var(--accent-red)" style={{ marginBottom: 10 }} />
-            <div className="ob-title" style={{ fontSize: 18, color: '#fecaca', marginBottom: 8 }}>
+          <div className="ob-panel" style={{ padding: 22, width: 'min(370px, 100%)', textAlign: 'center', borderColor: 'var(--accent-red)' }}>
+            <AlertTriangle size={36} color="var(--accent-red)" style={{ marginBottom: 8 }} />
+            <div className="ob-title" style={{ fontSize: 17, color: '#fecaca', marginBottom: 8 }}>
               КОРАБЛЬ ПОТЕРЯН
             </div>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18 }}>
-              Слишком высокая скорость столкновения с поверхностью ({body.nameRu}). Используйте
-              парашюты в атмосфере или ретроградное торможение двигателями перед посадкой.
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Слишком высокая скорость при посадке ({body.nameRu}). Используйте парашют или тормозите двигателем в режиме SAS → RETRO.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="ob-btn ob-btn-launch" onClick={handleResetFlight}>
                 <RotateCcw size={15} />
-                <span>Повторить запуск</span>
+                <span>Повторить</span>
               </button>
               <button className="ob-btn" onClick={() => setScreen('builder')}>
-                В конструктор
+                Конструктор
               </button>
             </div>
           </div>

@@ -50,7 +50,9 @@ export function computeOrbitalElements(
   const eccentricity = mag(eVec);
 
   // Semi-major axis a = -mu / (2 * E)
-  const isEscape = energy >= -1e-6 || eccentricity >= 0.9999;
+  // Note: straight vertical suborbital flight has e = 1.0 but negative energy (bound!).
+  // True escape occurs only when specific orbital energy >= 0.
+  const isEscape = energy >= 0;
   const semiMajorAxis = Math.abs(energy) > 1e-9 ? -mu / (2 * energy) : Infinity;
 
   // Inclination (relative to equatorial XZ plane, Y is north pole)
